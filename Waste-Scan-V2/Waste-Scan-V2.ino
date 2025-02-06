@@ -1,40 +1,24 @@
 #include <Keyboard.h>
 #include <SD.h>
 #include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "Display.h"
 
 #define NumCardTypes 14
-#define CardsPerType 2
+const int Library = 75;
+int LibrarySize;
 
 #define ClrButton 3
 #define RegButton 4
 #define PMButton 2
 #define PMLight 31
 
-#define Screen_Width 128
-#define Screen_Height 32
-
-#define OLED_MOSI 9
-#define OLED_CLK 10
-#define OLED_DC 11
-#define OLED_CS 12
-#define OLED_Reset 13
-
-Adafruit_SSD1306 display(Screen_Width, Screen_Height,
-  OLED_MOSI, OLED_CLK, OLED_DC, OLED_Reset, OLED_CS);
-
 const int chipSelect = BUILTIN_SDCARD;
 File cardBackups;
 
-String KnownCard[NumCardTypes][CardsPerType];
-String Card;
-const String Disposables[NumCardTypes] = {"aluminum can", "banana peel", "blender", "chicken bones", "envelope", "glass bottle", "soap bottle", "milk carton", "paper napkins", "soup carton", "paper tubes", "plastic bottle", "laptop computer", "smart phone"};
-
-bool Program = false;
-bool Hold = false;
-
+char KnownCard[Library][13];
+char Card[12];
+const String Disposables[14] = {"aluminum can", "banana peel", "blender", "chicken bones", "envelope", "glass bottle", "soap bottle", "milk carton", "paper napkins", "soup carton", "paper tubes", "plastic bottle", "laptop computer", "smart phone"};
+const String ID = "abcdefghijklmn";
 
 //-----------------------------------------------------------------------------------------------------------------------------------
 
@@ -44,8 +28,7 @@ void setup() {
   Serial.begin(9600);
   Serial8.begin(9600);
 
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  setupDisplay();
 
   pinMode(ClrButton,INPUT_PULLUP);
   pinMode(RegButton,INPUT_PULLUP);
@@ -61,158 +44,188 @@ void setup() {
   Serial.println("card initialized.");
 
   Pull();
-
-  if(!display.begin(SSD1306_SWITCHCAPVCC)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
-  }
-
-  delay(500);
-  // Serial.println("Currently Registered: ");
-  // for(int x=0; x<NumCardTypes; x++){
-  //   for(int y=0; y<CardsPerType; y++){
-  //     Serial.println(KnownCard[x][y]);
-  //   }
-  // }
 }
 
 void Push(){
   SD.remove("cardLog.txt");
   cardBackups = SD.open("cardLog.txt",FILE_WRITE);
 
-  for(int x = 0; x < NumCardTypes; x++){
-    for(int y = 0; y < CardsPerType; y++){
-      for(int z=0; z < 12; z++){
-        cardBackups.print(char(KnownCard[x][y][z]));
-      }
+  for(int x = 0; x < Library; x++){
+    if(strlen(KnownCard[x]) == 0){
+      cardBackups.print("-");
+      cardBackups.close();
+      return;
+    }
+    else{
+      cardBackups.print(String(KnownCard[x]));
+      delay(10);
     }
   }
-  cardBackups.close();
 }
 
 void Pull(){
   cardBackups = SD.open("cardLog.txt");
-  char Pulled[13];
+  String Incoming;
+  int x = 0;
+  int y = 0;
 
   if(cardBackups){
     while(cardBackups.available()){
-      for(int z=0; z < NumCardTypes; z++){
-        for(int y=0; y < CardsPerType; y++){
-          for(int x= 0; x < 13; x++){
-            Pulled[x] = char(cardBackups.read());
-            //Serial.print();
-          }
-          KnownCard[z][y] = String(Pulled); 
-          Serial.println(KnownCard[z][y]);
-        }
+      Incoming = cardBackups.read();
+      if(Incoming == "-"){
+        cardBackups.close();
+        LibrarySize = x + 1;
+        return;
       }
+      else{KnownCard[x][y] = Incoming[0];}
+      Serial.println(KnownCard[x][y]);
+
+      if(y == 12){
+        y=0;
+        x++;
+      }
+      else{y++;}
+      delay(100);
     }
   }
-  cardBackups.close();
 }
 
 void ReadRFID(){
+  int x = 0;
+  memset(Card,0,sizeof(Card));
+
   while(Serial8.available()){
     char IncomingByte = Serial8.read();
     if(IncomingByte != 2 && IncomingByte != 13 && IncomingByte != 10 && IncomingByte != 3){
-      String ReadByte = IncomingByte;
-      Card = Card + ReadByte;
+      Card[x] = IncomingByte;
+      Serial.print(Card[x]);
+      delay(10);
+      x++;
     }
-    else if (IncomingByte == 3){Serial.println(Card);}
-    else if(IncomingByte == 2){Card = "";}
+    else if(IncomingByte == 3){Serial.println();}
   }
 }
 
 void Run(){
   if(Serial8.available()){
     ReadRFID();
-    for(int x = 0; x < NumCardTypes; x++){
-      for(int y=0; y < CardsPerType; y++){
-        if(Card == KnownCard[x][y] && Card!=""){
-          Keyboard.print(x);
-
-          display.clearDisplay();
-          display.setCursor(0,0);
-          display.println(Disposables[x]);
-          display.println(Card);
-          display.display();
-          delay(200);
-
-          return;
+    for(int x = 0; x <= LibrarySize; x++){
+      for(int y=0; y < 12; y++){
+        if(Card[y] != KnownCard[x][y]){break;}
+        else if(y == 11 && strlen(KnownCard[x]) != 0){
+          for(int z = 0; z < NumCardTypes; z++){
+            if(KnownCard[x][12]==ID[z]){
+              Keyboard.print(z);
+              updateDisplay(Disposables[z],Card);
+              return;
+            }
+          }
         }
       }
     }
 
-    display.clearDisplay();
-    display.setCursor(0,0);
-    display.println(F("Unregistered"));
-    display.println(Card);
-    display.display();
-    delay(200);
+    updateDisplay(F("Unregistered"),Card);
   }
 }
 
 void ReProgram(){
+  static unsigned long fullClearTime;
+  static unsigned long clearTime;
+
   int Selected = analogRead(10);
   Selected = map(Selected,0,1023,0,NumCardTypes-1);
 
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(Disposables[Selected]);
-  display.display();
-  delay(200);
+  updateDisplay(Disposables[Selected]);
 
-  if(Serial8.available() && digitalRead(RegButton)==LOW){
-    ReadRFID();
-    
-    for(int x = 0; x < NumCardTypes; x++){
-      for(int y = 0; y < CardsPerType; y++){
-        if(Card == KnownCard[x][y] && Card != ""){
-          display.clearDisplay();
-          display.setCursor(0,0);
-          display.println(F("Card Already Assigned:"));
-          display.println(Disposables[x]);
-          display.display();
-          delay(3000);
-
-          return;
-        }
-      }
-    }
-
-    for(int x = 0; x < CardsPerType; x++){
-      if(KnownCard[Selected][x] == ""){
-        KnownCard[Selected][x] = Card;
-        Push();
-
-        display.clearDisplay();
-        display.setCursor(0,0);
-        display.println(F("Card Assigned:"));
-        display.println(Disposables[Selected]);
-        display.display();
-        delay(3000);
-
-        return;
-
-      }
-      else if (x == CardsPerType - 1){
-        display.clearDisplay();
-        display.setCursor(0,0);
-        display.println(F("Max Cards registered for: "));
-        display.println(Disposables[Selected]);
-        display.println(F("Please clear repository"));
-        display.display();
-        delay(3000);
-      }
-    }
+  if(digitalRead(RegButton) == LOW){AddCard();}
+  else if (digitalRead(ClrButton) == LOW){
+    clearTime = millis() + 1000;
+    fullClearTime = millis() + 10000;
+    ClearData();
+    if(fullClearTime <= millis()){FullClearData();}
+  }
+  else if(digitalRead(ClrButton) == HIGH && millis() <= clearTime){
+    Shift(0);
+    clearTime = clearTime - 1000;
   }
 
 }
 
+void AddCard(){
+  int Selected = analogRead(10);
+  Selected = map(Selected,0,1023,0,NumCardTypes-1);
+
+  if(Serial8.available() && digitalRead(RegButton) == LOW){
+    ReadRFID();
+    Serial.println("Sorting");
+
+    for(int x = 0; x <= LibrarySize; x++){
+      for(int y = 0; y < 12; y++){
+        if(KnownCard[x][y] != Card[y] && strlen(KnownCard[x]) != 0){break;}
+        else if(KnownCard[x][y] != Card[y] && strlen(KnownCard[x]) == 0){
+          for(int z = 0; z < 12; z++){KnownCard[x][z] = Card[z];}
+          KnownCard[x][12] = ID[Selected];
+          Serial.println(String(KnownCard[x]));
+          LibrarySize++;
+          Push();
+
+          updateDisplay(F("Card Assigned:"),Disposables[Selected]);
+          delay(3000);
+          return;
+        }
+        else if (y == 11){
+          for(int z = 0; z < NumCardTypes; z++){
+            if(KnownCard[x][12]==ID[z]){
+              
+              updateDisplay(F("Card Already Assigned:"),Disposables[z]);
+              delay(3000);
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void ClearData(){
+  if(Serial8.available()){
+    ReadRFID();
+    Serial.println("Preparing to erase");
+    for(int x = 0; x <= LibrarySize; x++){
+      for(int y = 0; y < 12; y++){
+        if(Card[y] != KnownCard[x][y]){break;}
+        else if(y == 11){
+          Shift(x);
+          Serial.println("Shifted");
+          return;
+        }
+      }
+    }
+  }
+}
+
+void FullClearData(){memset(KnownCard,0,sizeof(KnownCard));}
+
+void Shift(int Replace){
+  if(Replace != LibrarySize){
+    for(int x = Replace; x < LibrarySize; x++){
+      for(int y = 0; y < 13; y++){
+        KnownCard[x][y] = KnownCard[x+1][y];
+      }
+    }
+  }
+  memset(KnownCard[LibrarySize], 0, sizeof(KnownCard[LibrarySize]));
+  LibrarySize = LibrarySize - 1;
+  Push();
+}
+
 void loop(){
+  static bool Hold;
+  static bool Program;
+
   if(digitalRead(PMButton) == LOW && Hold == false){
-    display.clearDisplay();
-    display.display();
+    updateDisplay();
     Program = !Program;
     Hold = true;
   }
