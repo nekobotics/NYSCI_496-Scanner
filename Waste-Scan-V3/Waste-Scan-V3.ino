@@ -1,4 +1,6 @@
 #include <Keyboard.h>
+#include <SD.h>
+#include <SPI.h>
 #include "Display.h"
 
 #define ClrButton 3
@@ -11,6 +13,9 @@
 int currentLibrarySize = 0;
 
 const String Disposables[14] = {"aluminum can", "banana peel", "blender", "chicken bones", "envelope", "glass bottle", "soap bottle", "milk carton", "paper napkins", "soup carton", "paper tubes", "plastic bottle", "laptop computer", "smart phone"};
+
+const int chipSelect = BUILTIN_SDCARD;
+File cardBackups;
 
 struct Card{
   char ID[12];
@@ -86,6 +91,7 @@ void Program(char newCard[12], bool newRead){
     currentLibrarySize++;
     cardLibrary[currentLibrarySize - 1].Write(newCard,Selected);
     updateDisplay(F("saved to"),Disposables[Selected]);
+    Push();
     delay(1000);
   }
   else if(digitalRead(ClrButton) == LOW){
@@ -117,6 +123,7 @@ void Shift(int shift){
   cardLibrary[currentLibrarySize - 1].slide = 0;
 
   if(currentLibrarySize != 0){currentLibrarySize--;}
+  Push();
   delay(1000);
 }
 
@@ -127,7 +134,54 @@ void Reset(){
     cardLibrary[x].slide = 0;
   }
   currentLibrarySize = 0;
+  Push();
   delay(1000);
+}
+
+void Pull(){
+  cardBackups = SD.open("cardLog.txt");
+  String Incoming;
+  char pulledCard[12];
+  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m','n'};
+  int x = 0;
+  int y = 0;
+
+  
+  if(cardBackups){
+    while(cardBackups.available() && Incoming != "-"){
+      Incoming = cardBackups.read();
+        if(y < 12){
+          pulledCard[y] = Incoming[0];
+          Serial.print(Incoming);
+          y++;
+        }
+        else{
+          for(int z = 0; z < numCardTypes; z++){
+            if(Incoming[0] == Designators[z]){
+              cardLibrary[x].Write(pulledCard,z);
+              Serial.println();
+              x++;
+              y = 0;
+            }
+          }
+        }
+    }
+  }
+  currentLibrarySize = x + 1;
+}
+
+void Push(){
+  SD.remove("cardLog.txt");
+  cardBackups = SD.open("cardLog.txt", FILE_WRITE);
+  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m','n'};
+
+  for(int x = 0; x < currentLibrarySize; x++){
+    for(int y = 0; y < 12; y++){cardBackups.print(cardLibrary[x].ID[y]);}
+    cardBackups.print(Designators[cardLibrary[x].slide]);
+  }
+  
+  cardBackups.print("-");
+  cardBackups.close();
 }
 
 void setup() {
@@ -141,6 +195,14 @@ void setup() {
   pinMode(RegButton,INPUT_PULLUP);
   pinMode(PMButton,INPUT_PULLUP);
   pinMode(PMLight,OUTPUT);
+
+  if (!SD.begin(chipSelect)) {
+    Serial.println("Card failed, or not present");
+    while (1) {}
+  }
+  Serial.println("card initialized.");
+
+  Pull();
 }
 
 void loop() {
