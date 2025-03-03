@@ -8,11 +8,11 @@
 #define PMButton 2
 #define PMLight 31
 
-#define numCardTypes 14
+#define numCardTypes 13
 #define librarySize 100
 int currentLibrarySize = 0;
 
-const String Disposables[14] = {"aluminum can", "banana peel", "blender", "chicken bones", "envelope", "glass bottle", "soap bottle", "milk carton", "paper napkins", "soup carton", "paper tubes", "plastic bottle", "laptop computer", "smart phone"};
+const String Disposables[14] = {"aluminum can", "aluminum foil", "banana peel", "egg carton", "envelope", "glass bottle", "milk carton", "newspaper", "paper cup", "paper towels", "paper tubes", "plastic bottle", "soap bottle"};
 
 const int chipSelect = BUILTIN_SDCARD;
 File cardBackups;
@@ -20,12 +20,13 @@ File cardBackups;
 struct Card{
   char ID[12];
   int slide;
+  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m'};
 
   bool identical(char newCard[12]){
     for(int x = 0; x < 12; x++){
       if(newCard[x] != ID[x]){return 0;}
       else if(x == 11){
-        Keyboard.print(slide);
+        Keyboard.print(Designators[slide]);
         updateDisplay(Disposables[slide],String(ID));
         return 1;
       }
@@ -142,7 +143,7 @@ void Pull(){
   cardBackups = SD.open("cardLog.txt");
   String Incoming;
   char pulledCard[12];
-  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m','n'};
+  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m'};
   int x = 0;
   int y = 0;
 
@@ -173,7 +174,7 @@ void Pull(){
 void Push(){
   SD.remove("cardLog.txt");
   cardBackups = SD.open("cardLog.txt", FILE_WRITE);
-  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m','n'};
+  const char Designators[numCardTypes]= {'a','b','c','d','e','f','g','h','i','j','k','l','m'};
 
   for(int x = 0; x < currentLibrarySize; x++){
     for(int y = 0; y < 12; y++){cardBackups.print(cardLibrary[x].ID[y]);}
