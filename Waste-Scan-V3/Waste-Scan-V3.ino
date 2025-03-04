@@ -191,6 +191,7 @@ void setup() {
   Serial8.begin(9600);
 
   setupDisplay();
+  updateDisplay();
 
   pinMode(ClrButton,INPUT_PULLUP);
   pinMode(RegButton,INPUT_PULLUP);
@@ -199,6 +200,8 @@ void setup() {
 
   if (!SD.begin(chipSelect)) {
     Serial.println("Card failed, or not present");
+    updateDisplay(F("SD Card failure"));
+
     while (1) {}
   }
   Serial.println("card initialized.");
