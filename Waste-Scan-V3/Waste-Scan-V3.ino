@@ -9,10 +9,10 @@
 #define PMLight 31
 
 #define numCardTypes 13
-#define librarySize 100
+#define librarySize 2
 int currentLibrarySize = 0;
 
-const String Disposables[14] = {"aluminum can", "aluminum foil", "banana peel", "egg carton", "envelope", "glass bottle", "milk carton", "newspaper", "paper cup", "paper towels", "paper tubes", "plastic bottle", "soap bottle"};
+const String Disposables[13] = {"aluminum can", "aluminum foil", "banana peel", "egg carton", "envelope", "glass bottle", "milk carton", "newspaper", "paper cup", "paper towels", "paper tubes", "plastic bottle", "soap bottle"};
 
 const int chipSelect = BUILTIN_SDCARD;
 File cardBackups;
@@ -79,9 +79,10 @@ void Program(char newCard[12], bool newRead){
   int Selected = analogRead(10);
   Selected = map(Selected,0,1023,0,numCardTypes-1);
 
-  updateDisplay(Disposables[Selected]);
+  if(currentLibrarySize >= librarySize){updateDisplay(F("Repository Full"),F("Remove cards"));}
+  else{updateDisplay(Disposables[Selected]);}
 
-  if(digitalRead(RegButton) == LOW && newRead){
+  if(digitalRead(RegButton) == LOW && newRead && currentLibrarySize < librarySize){
     for(int x = 0; x < currentLibrarySize; x++){
       if(cardLibrary[x].identical(newCard)){
         updateDisplay(F("alreadey saved to"),Disposables[cardLibrary[x].slide]);
