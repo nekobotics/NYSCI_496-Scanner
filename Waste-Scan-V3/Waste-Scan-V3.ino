@@ -9,7 +9,7 @@
 #define PMLight 31
 
 #define numCardTypes 13
-#define librarySize 2
+#define librarySize 100
 int currentLibrarySize = 0;
 
 const String Disposables[13] = {"aluminum can", "aluminum foil", "banana peel", "egg carton", "envelope", "glass bottle", "milk carton", "newspaper", "paper cup", "paper towels", "paper tubes", "plastic bottle", "soap bottle"};
